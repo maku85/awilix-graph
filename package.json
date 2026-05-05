@@ -1,0 +1,85 @@
+{
+  "name": "awilix-graph",
+  "version": "0.1.0",
+  "description": "Inspect an Awilix DI container and generate a visual dependency graph (DOT/Mermaid/JSON/HTML)",
+  "author": "Maku <makuma85@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maku85/awilix-graph.git"
+  },
+  "homepage": "https://github.com/maku85/awilix-graph#readme",
+  "bugs": {
+    "url": "https://github.com/maku85/awilix-graph/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "awilix-graph": "dist/cli.js"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "node -e \"const {readFileSync: r,writeFileSync: w}=require('fs');const f='dist/cli.js';w(f,'#!/usr/bin/env node\\n'+r(f,'utf8'));require('fs').chmodSync(f,'755')\"",
+    "prepublishOnly": "pnpm build && pnpm test",
+    "release": "release-it",
+    "release:patch": "release-it patch --ci",
+    "release:minor": "release-it minor --ci",
+    "release:major": "release-it major --ci",
+    "dev": "ts-node src/cli.ts",
+    "example": "ts-node src/cli.ts -c examples/container.js -f mermaid",
+    "example:dot": "ts-node src/cli.ts -c examples/container.js -f dot",
+    "example:json": "ts-node src/cli.ts -c examples/container.js -f json",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src",
+    "format": "biome format --write src"
+  },
+  "keywords": [
+    "awilix",
+    "dependency-injection",
+    "graph",
+    "visualization",
+    "dot",
+    "mermaid",
+    "graphviz",
+    "cli",
+    "html"
+  ],
+  "peerDependencies": {
+    "awilix": ">=5.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "awilix": "^10.0.0",
+    "release-it": "^20.0.1",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.5"
+  }
+}
