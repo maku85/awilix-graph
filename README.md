@@ -21,7 +21,7 @@ Inspect an [Awilix](https://github.com/jeffijoe/awilix) DI container and generat
 
 ## Requirements
 
-- **Node.js** ≥ 18.0.0
+- **Node.js** ≥ 20.0.0
 - **awilix** ≥ 5.0.0 (peer dependency, installed in the project whose container you are inspecting)
 - **ts-node** or **tsx** — only required to load TypeScript container files
 
