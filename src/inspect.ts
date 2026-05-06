@@ -28,9 +28,23 @@ export function inspectContainer(container: AwilixContainer): GraphNode[] {
 	}
 
 	return Object.entries(registrations).map(([name, resolver]) => {
-		const { type, dependencies } = probeResolver(resolver as AnyResolver, name);
-		const lifetime = extractLifetime(resolver as AnyResolver);
-		return { name, type, dependencies, missing: false, lifetime };
+		try {
+			const { type, dependencies } = probeResolver(
+				resolver as AnyResolver,
+				name
+			);
+			const lifetime = extractLifetime(resolver as AnyResolver);
+			return { name, type, dependencies, missing: false, lifetime };
+		} catch (err) {
+			return {
+				name,
+				type: 'error',
+				dependencies: [],
+				missing: false,
+				lifetime: undefined,
+				error: err instanceof Error ? err.message : String(err),
+			};
+		}
 	});
 }
 

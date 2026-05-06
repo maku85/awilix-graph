@@ -71,6 +71,17 @@ async function run(): Promise<void> {
 		die(String(err.message))
 	);
 	const nodes = inspectContainer(container);
+
+	const errorNodes = nodes.filter((n) => n.type === 'error');
+	if (errorNodes.length > 0) {
+		process.stderr.write(
+			`\n⚠  ${errorNodes.length} node(s) could not be inspected due to errors.\n`
+		);
+		for (const n of errorNodes) {
+			process.stderr.write(`   - ${n.name}: ${n.error || 'Unknown error'}\n`);
+		}
+	}
+
 	const graph = buildGraph(nodes);
 
 	if (!opts.missing) {
@@ -132,6 +143,7 @@ function printList(
 		value: [] as string[],
 		alias: [] as string[],
 		unknown: [] as string[],
+		error: [] as string[],
 	};
 	for (const n of nodes) {
 		byType[n.type].push(n.name);
@@ -143,6 +155,7 @@ function printList(
 		value: '●',
 		alias: '→',
 		unknown: '?',
+		error: '⚠',
 	};
 
 	const pluralLabel: Record<string, string> = {
@@ -151,6 +164,7 @@ function printList(
 		value: 'VALUES',
 		alias: 'ALIASES',
 		unknown: 'UNKNOWNS',
+		error: 'ERRORS',
 	};
 
 	for (const [type, names] of Object.entries(byType)) {
@@ -161,12 +175,14 @@ function printList(
 			// biome-ignore lint/style/noNonNullAssertion: guaranteed to exist
 			const node = nodes.find((n) => n.name === name)!;
 			const lifetimeBadge = node.lifetime ? ` [${node.lifetime}]` : '';
-			const suffix =
-				node.type === 'alias'
-					? ` → ${node.dependencies[0]}`
-					: node.dependencies.length
-						? ` → [${node.dependencies.join(', ')}]`
-						: '';
+			let suffix = '';
+			if (node.type === 'alias') {
+				suffix = ` → ${node.dependencies[0]}`;
+			} else if (node.type === 'error') {
+				suffix = node.error ? ` [${node.error}]` : ' [error]';
+			} else if (node.dependencies.length) {
+				suffix = ` → [${node.dependencies.join(', ')}]`;
+			}
 			process.stdout.write(
 				`  ${icon[type]} ${name}${lifetimeBadge}${suffix}\n`
 			);
