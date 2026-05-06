@@ -1,6 +1,12 @@
 import type { DependencyGraph, GraphNode } from '../types';
 
 export function formatMermaid(graph: DependencyGraph): string {
+	// Pre-compute collision-free Mermaid node IDs.
+	// Two names that differ only in special chars (e.g. "my-svc" vs "my.svc") would both
+	// sanitise to "my_svc" — append a numeric suffix to disambiguate.
+	const nodeIds = buildNodeIdMap(graph.nodes);
+	const nid = (name: string) => nodeIds.get(name) ?? name.replace(/[^a-zA-Z0-9_]/g, '_');
+
 	const lines: string[] = ['graph LR'];
 
 	const cycleEdges = new Set(
@@ -11,7 +17,7 @@ export function formatMermaid(graph: DependencyGraph): string {
 
 	// Node definitions with labels
 	for (const node of graph.nodes) {
-		lines.push(`  ${nodeId(node.name)}${nodeShape(node)}`);
+		lines.push(`  ${nid(node.name)}${nodeShape(node)}`);
 	}
 
 	lines.push('');
@@ -28,7 +34,7 @@ export function formatMermaid(graph: DependencyGraph): string {
 		} else {
 			arrow = '-->';
 		}
-		lines.push(`  ${nodeId(edge.from)} ${arrow} ${nodeId(edge.to)}`);
+		lines.push(`  ${nid(edge.from)} ${arrow} ${nid(edge.to)}`);
 	}
 
 	// Class definitions
@@ -52,7 +58,7 @@ export function formatMermaid(graph: DependencyGraph): string {
 
 	for (const node of graph.nodes) {
 		const cls = nodeClass(node);
-		byClass[cls].push(nodeId(node.name));
+		byClass[cls].push(nid(node.name));
 	}
 
 	for (const [cls, ids] of Object.entries(byClass)) {
@@ -71,9 +77,25 @@ export function formatMermaid(graph: DependencyGraph): string {
 	return lines.join('\n');
 }
 
-// Mermaid node IDs cannot contain hyphens or dots — sanitise to underscores
-function nodeId(name: string): string {
-	return name.replace(/[^a-zA-Z0-9_]/g, '_');
+// Sanitise a node name to a valid Mermaid ID, then disambiguate collisions
+// caused by different names that map to the same sanitised string.
+function buildNodeIdMap(nodes: GraphNode[]): Map<string, string> {
+	const byBase = new Map<string, string[]>();
+	for (const node of nodes) {
+		const base = node.name.replace(/[^a-zA-Z0-9_]/g, '_');
+		const group = byBase.get(base) ?? [];
+		if (!byBase.has(base)) byBase.set(base, group);
+		group.push(node.name);
+	}
+	const result = new Map<string, string>();
+	for (const [base, names] of byBase) {
+		if (names.length === 1) {
+			result.set(names[0], base);
+		} else {
+			names.forEach((name, i) => result.set(name, `${base}_${i}`));
+		}
+	}
+	return result;
 }
 
 function nodeShape(node: GraphNode): string {

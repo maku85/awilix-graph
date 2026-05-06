@@ -207,6 +207,29 @@ describe('focusSubgraph — cycles', () => {
 	});
 });
 
+// ─── large graph robustness ──────────────────────────────────────────────────
+
+describe('focusSubgraph — large graph', () => {
+	it('truncates the available-names list in the error message for large containers', () => {
+		const nodes = Array.from({ length: 50 }, (_, i) => node(`n${i}`));
+		const graph: DependencyGraph = {
+			nodes,
+			edges: [],
+			cycles: [],
+		};
+		expect(() => focusSubgraph(graph, 'missing')).toThrow(/\(30 more\)/);
+	});
+
+	it('handles a graph with 5 000 nodes without noticeable slowdown', () => {
+		const size = 5000;
+		const nodes = Array.from({ length: size }, (_, i) => node(`n${i}`, i > 0 ? [`n${i - 1}`] : []));
+		const edges = nodes.flatMap((n) => n.dependencies.map((d) => ({ from: n.name, to: d })));
+		const graph: DependencyGraph = { nodes, edges, cycles: [] };
+		const sub = focusSubgraph(graph, 'n2500');
+		expect(sub.nodes.length).toBe(size); // all nodes connected
+	});
+});
+
 // ─── missing nodes ───────────────────────────────────────────────────────────
 
 describe('focusSubgraph — missing nodes', () => {

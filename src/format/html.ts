@@ -55,17 +55,24 @@ export function formatHtml(graph: DependencyGraph): string {
 	});
 
 	// Pass 3: attach cross-links using the correct diagram indices.
+	// Pre-index outgoing edges to avoid O(nodes × edges) filtering per diagram.
+	const outgoingEdges = new Map<string, string[]>();
+	for (const e of graph.edges) {
+		const arr = outgoingEdges.get(e.from) ?? [];
+		if (!outgoingEdges.has(e.from)) outgoingEdges.set(e.from, arr);
+		arr.push(e.to);
+	}
+
 	const diagrams = diagramBlocks.map(({ nodes, src }, diagramIdx) => {
 		const inDiagram = new Set(nodes.map((n) => n.name));
 		const crossLinks: string[] = [];
 		for (const n of nodes) {
-			for (const e of graph.edges.filter(
-				(e) => e.from === n.name && !inDiagram.has(e.to)
-			)) {
-				const targetIdx = nodeToBlock[e.to];
+			for (const to of outgoingEdges.get(n.name) ?? []) {
+				if (inDiagram.has(to)) continue;
+				const targetIdx = nodeToBlock[to];
 				if (targetIdx !== undefined && targetIdx !== diagramIdx) {
 					crossLinks.push(
-						`<li>${n.name} → <a href="#diagram-${targetIdx + 1}">${e.to} (Diagram ${targetIdx + 1})</a></li>`
+						`<li>${n.name} → <a href="#diagram-${targetIdx + 1}">${to} (Diagram ${targetIdx + 1})</a></li>`
 					);
 				}
 			}

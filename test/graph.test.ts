@@ -72,6 +72,28 @@ describe('buildGraph', () => {
 		});
 	});
 
+	describe('cycle detection on large graphs', () => {
+		it('handles a deep linear chain without stack overflow', () => {
+			// A chain of 5000 nodes: n0 → n1 → … → n4999
+			// Recursive DFS would exceed the call stack; iterative must not throw.
+			const depth = 5000;
+			const nodes = Array.from({ length: depth }, (_, i) =>
+				node(`n${i}`, i + 1 < depth ? [`n${i + 1}`] : [])
+			);
+			expect(() => buildGraph(nodes)).not.toThrow();
+			expect(buildGraph(nodes).cycles).toEqual([]);
+		});
+
+		it('detects a cycle at the end of a long chain', () => {
+			const depth = 1000;
+			const nodes = Array.from({ length: depth }, (_, i) =>
+				node(`n${i}`, [`n${(i + 1) % depth}`])
+			);
+			const { cycles } = buildGraph(nodes);
+			expect(cycles.length).toBeGreaterThan(0);
+		});
+	});
+
 	describe('alias nodes', () => {
 		it('alias deps create edges to the target', () => {
 			const graph = buildGraph([

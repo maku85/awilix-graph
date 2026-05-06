@@ -15,9 +15,13 @@ export function focusSubgraph(
 	depth?: number
 ): DependencyGraph {
 	if (!graph.nodes.some((n) => n.name === name)) {
+		const MAX_SHOWN = 20;
+		const names = graph.nodes.map((n) => n.name);
+		const shown = names.slice(0, MAX_SHOWN).join(', ');
+		const suffix = names.length > MAX_SHOWN ? `, … (${names.length - MAX_SHOWN} more)` : '';
 		throw new Error(
 			`"${name}" is not registered in this container. ` +
-				`Available names: ${graph.nodes.map((n) => n.name).join(', ')}`
+				`Available names: ${shown}${suffix}`
 		);
 	}
 
@@ -35,12 +39,13 @@ export function focusSubgraph(
 	}
 
 	// BFS outward from the focus node in both directions simultaneously.
+	// Using an index pointer instead of shift() keeps this O(n) not O(n²).
 	const included = new Set<string>();
 	const queue: Array<{ name: string; dist: number }> = [{ name, dist: 0 }];
+	let head = 0;
 
-	while (queue.length > 0) {
-		// biome-ignore lint/style/noNonNullAssertion: queue is non-empty by loop condition
-		const item = queue.shift()!;
+	while (head < queue.length) {
+		const item = queue[head++];
 		if (included.has(item.name)) continue;
 		included.add(item.name);
 
@@ -93,10 +98,10 @@ export function limitDepth(
 		name: n.name,
 		dist: 0,
 	}));
+	let head = 0;
 
-	while (queue.length > 0) {
-		// biome-ignore lint/style/noNonNullAssertion: queue is non-empty by loop condition
-		const item = queue.shift()!;
+	while (head < queue.length) {
+		const item = queue[head++];
 		if (included.has(item.name)) continue;
 		included.add(item.name);
 

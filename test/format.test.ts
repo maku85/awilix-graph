@@ -107,6 +107,20 @@ describe('formatMermaid', () => {
 		expect(formatMermaid(graph)).toContain('my_service[');
 	});
 
+	it('disambiguates node IDs that would otherwise collide after sanitisation', () => {
+		// "my-svc" and "my.svc" both sanitise to "my_svc" — they must get distinct IDs
+		const graph = makeGraph({
+			nodes: [
+				{ name: 'my-svc', type: 'class', dependencies: [], missing: false },
+				{ name: 'my.svc', type: 'class', dependencies: [], missing: false },
+			],
+			edges: [],
+		});
+		const out = formatMermaid(graph);
+		expect(out).toContain('my_svc_0[');
+		expect(out).toContain('my_svc_1[');
+	});
+
 	it('appends cycle comment when cycles exist', () => {
 		const graph = makeGraph({ cycles: [['a', 'b']] });
 		expect(formatMermaid(graph)).toContain('%% Cycle:');
