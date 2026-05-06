@@ -43,6 +43,10 @@ program
 	.option(
 		'--open',
 		'Open the graph in the browser after rendering (mermaid.live / GraphvizOnline / temp file for json)'
+	)
+	.option(
+		'--fail-on <checks>',
+		'Exit with code 1 when issues are found. Values: cycles, violations, all (comma-separated)'
 	);
 
 program.parse(process.argv);
@@ -56,6 +60,7 @@ const opts = program.opts<{
 	depth?: string;
 	list: boolean;
 	open: boolean;
+	failOn?: string;
 }>();
 
 const validFormats: OutputFormat[] = ['dot', 'mermaid', 'json', 'html'];
@@ -134,12 +139,37 @@ async function run(): Promise<void> {
 		process.stderr.write(`Opened: ${target}\n`);
 	}
 
+	const violations = graph.violations ?? [];
+	const violationErrors = violations.filter((v) => v.severity === 'error');
+	const violationWarnings = violations.filter((v) => v.severity === 'warning');
+
+	if (violations.length > 0) {
+		process.stderr.write(
+			`\n⚠  Lifetime violations detected` +
+				` (${violationErrors.length} error${violationErrors.length !== 1 ? 's' : ''},` +
+				` ${violationWarnings.length} warning${violationWarnings.length !== 1 ? 's' : ''}):\n`
+		);
+		for (const v of violations) {
+			const icon = v.severity === 'error' ? '✗' : '!';
+			process.stderr.write(
+				`   ${icon} ${v.from} [${v.fromLifetime}] → ${v.to} [${v.toLifetime}]\n`
+			);
+		}
+	}
+
 	if (graph.cycles.length > 0) {
 		process.stderr.write(`\n⚠  Cycles detected (${graph.cycles.length}):\n`);
 		for (const cycle of graph.cycles) {
 			process.stderr.write(`   ${cycle.join(' → ')} → ${cycle[0]}\n`);
 		}
 	}
+
+	const failOn = new Set(
+		(opts.failOn ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+	);
+	const failAll = failOn.has('all');
+	if ((failAll || failOn.has('violations')) && violationErrors.length > 0) process.exit(1);
+	if ((failAll || failOn.has('cycles')) && graph.cycles.length > 0) process.exit(1);
 }
 
 function printList(

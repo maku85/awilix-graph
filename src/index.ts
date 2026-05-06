@@ -6,13 +6,16 @@ export { formatJson } from './format/json';
 export { formatMermaid } from './format/mermaid';
 export { buildGraph } from './graph';
 export { inspectContainer } from './inspect';
+export { detectViolations } from './violations';
 export type {
 	DependencyGraph,
 	GraphEdge,
 	GraphNode,
 	Lifetime,
+	LifetimeViolation,
 	NodeType,
 	OutputFormat,
+	ViolationSeverity,
 } from './types';
 
 import { formatDot } from './format/dot';

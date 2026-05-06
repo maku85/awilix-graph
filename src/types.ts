@@ -1,5 +1,16 @@
 export type NodeType = 'class' | 'function' | 'value' | 'alias' | 'unknown';
 export type Lifetime = 'SINGLETON' | 'TRANSIENT' | 'SCOPED';
+export type ViolationSeverity = 'error' | 'warning';
+
+export interface LifetimeViolation {
+	/** The service with the longer lifetime */
+	from: string;
+	/** The dependency with the shorter lifetime */
+	to: string;
+	fromLifetime: Lifetime;
+	toLifetime: Lifetime;
+	severity: ViolationSeverity;
+}
 
 export interface GraphNode {
 	name: string;
@@ -24,6 +35,8 @@ export interface DependencyGraph {
 	edges: GraphEdge[];
 	/** Each cycle is a list of node names forming the loop */
 	cycles: string[][];
+	/** Lifetime violations found in the graph (only present when built via buildGraph) */
+	violations?: LifetimeViolation[];
 }
 
 export type OutputFormat = 'dot' | 'mermaid' | 'json' | 'html';

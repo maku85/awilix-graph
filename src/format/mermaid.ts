@@ -22,7 +22,13 @@ export function formatMermaid(graph: DependencyGraph): string {
 
 	lines.push('');
 
-	// Edges
+	// Edges — track index for linkStyle violation highlighting
+	const violationKeys = new Map(
+		(graph.violations ?? []).map((v) => [`${v.from}\0${v.to}`, v.severity])
+	);
+	const violationStyles: string[] = [];
+	let edgeIdx = 0;
+
 	for (const edge of graph.edges) {
 		const isCycle = cycleEdges.has(`${edge.from}-->${edge.to}`);
 		const fromNode = graph.nodes.find((n) => n.name === edge.from);
@@ -35,6 +41,13 @@ export function formatMermaid(graph: DependencyGraph): string {
 			arrow = '-->';
 		}
 		lines.push(`  ${nid(edge.from)} ${arrow} ${nid(edge.to)}`);
+
+		const severity = violationKeys.get(`${edge.from}\0${edge.to}`);
+		if (severity) {
+			const color = severity === 'error' ? '#e53e3e' : '#ed8936';
+			violationStyles.push(`  linkStyle ${edgeIdx} stroke:${color},stroke-width:2.5px`);
+		}
+		edgeIdx++;
 	}
 
 	// Class definitions
@@ -65,6 +78,11 @@ export function formatMermaid(graph: DependencyGraph): string {
 		if (ids.length > 0) {
 			lines.push(`  class ${ids.join(',')} ${cls}`);
 		}
+	}
+
+	if (violationStyles.length > 0) {
+		lines.push('');
+		lines.push(...violationStyles);
 	}
 
 	if (graph.cycles.length > 0) {

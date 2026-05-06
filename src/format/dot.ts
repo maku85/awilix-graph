@@ -37,15 +37,24 @@ export function formatDot(graph: DependencyGraph): string {
 
 	lines.push('');
 
+	const violationMap = new Map(
+		(graph.violations ?? []).map((v) => [`${v.from}\0${v.to}`, v])
+	);
+
 	for (const edge of graph.edges) {
 		const key = `${edge.from}->${edge.to}`;
 		const isCycle = cycleEdges.has(key);
 		const fromNode = graph.nodes.find((n) => n.name === edge.from);
+		const violation = violationMap.get(`${edge.from}\0${edge.to}`);
 		let attrs: string;
 		if (isCycle) {
 			attrs = ' [color="#d44", style=dashed, label="cycle"]';
 		} else if (fromNode?.type === 'alias') {
 			attrs = ' [style=dashed, arrowhead=open, label="alias"]';
+		} else if (violation) {
+			const color = violation.severity === 'error' ? '#e53e3e' : '#ed8936';
+			const label = `${violation.fromLifetime}→${violation.toLifetime}`;
+			attrs = ` [color="${color}", penwidth=2, label="${label}"]`;
 		} else {
 			attrs = '';
 		}

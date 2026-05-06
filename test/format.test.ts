@@ -228,48 +228,59 @@ describe('formatJson', () => {
 	});
 });
 
-describe('formatHtml chunking', () => {
-	function makeNode(name: string): GraphNode {
-		return { name, type: 'class', dependencies: [], missing: false };
-	}
-
-	it('produces a single diagram for graphs with ≤ 40 nodes', () => {
-		const nodes = Array.from({ length: 40 }, (_, i) => makeNode(`n${i}`));
-		const out = formatHtml({ nodes, edges: [], cycles: [] });
-		expect((out.match(/id="diagram-/g) ?? []).length).toBe(1);
+describe('formatHtml interactive', () => {
+	it('loads vis-network CDN script', () => {
+		expect(formatHtml(makeGraph())).toContain('cdn.jsdelivr.net/npm/vis-network');
 	});
 
-	it('splits into multiple diagrams for graphs with > 40 nodes', () => {
-		const nodes = Array.from({ length: 41 }, (_, i) => makeNode(`n${i}`));
-		const out = formatHtml({ nodes, edges: [], cycles: [] });
-		expect((out.match(/id="diagram-/g) ?? []).length).toBe(2);
+	it('embeds graph data as JSON with nodes, edges, cycles and violations', () => {
+		const out = formatHtml(makeGraph());
+		expect(out).toContain('var GRAPH =');
+		// embedded JSON includes the node name
+		expect(out).toContain('"logger"');
+		expect(out).toContain('"edges"');
+		expect(out).toContain('"cycles"');
+		expect(out).toContain('"violations"');
 	});
 
-	it('generates a cross-link pointing to the correct target diagram', () => {
-		// n0 lands in diagram-1 (block 0, indices 0–39), n40 in diagram-2 (block 1)
-		const nodes = Array.from({ length: 82 }, (_, i) => makeNode(`n${i}`));
-		const out = formatHtml({ nodes, edges: [{ from: 'n0', to: 'n40' }], cycles: [] });
-		expect(out).toContain('href="#diagram-2"');
-		expect(out).toContain('n40 (Diagram 2)');
+	it('initialises a vis.Network', () => {
+		expect(formatHtml(makeGraph())).toContain('new vis.Network(');
 	});
 
-	it('cross-links reference correct diagram when sub-chunking shifts indices', () => {
-		// Build a block-0 whose Mermaid output will be large enough to trigger sub-chunking.
-		// We achieve this by giving every node a very long name (padding to ~1 200 chars each,
-		// so 40 nodes × ~1 200 chars ≈ 48 000 chars — right at the limit).
-		const pad = 'x'.repeat(1180);
-		const block0 = Array.from({ length: 40 }, (_, i) => makeNode(`${pad}${i}`));
-		// block1 has one regular node that block0's first node links to
-		const block1Node = makeNode('target');
-		const nodes = [...block0, block1Node];
-		const out = formatHtml({
-			nodes,
-			edges: [{ from: block0[0].name, to: 'target' }],
-			cycles: [],
+	it('includes a search input', () => {
+		expect(formatHtml(makeGraph())).toContain('id="search"');
+	});
+
+	it('includes lifetime filter buttons', () => {
+		const out = formatHtml(makeGraph());
+		expect(out).toContain('id="filter-lifetime"');
+		expect(out).toContain('data-val="SINGLETON"');
+		expect(out).toContain('data-val="SCOPED"');
+		expect(out).toContain('data-val="TRANSIENT"');
+	});
+
+	it('includes type filter buttons', () => {
+		const out = formatHtml(makeGraph());
+		expect(out).toContain('id="filter-type"');
+		expect(out).toContain('data-val="class"');
+		expect(out).toContain('data-val="function"');
+	});
+
+	it('includes a detail panel', () => {
+		expect(formatHtml(makeGraph())).toContain('id="detail-panel"');
+		expect(formatHtml(makeGraph())).toContain('id="dp-body"');
+	});
+
+	it('escapes </script> sequences in embedded JSON', () => {
+		const graph = makeGraph({
+			nodes: [{ name: 'x', type: 'value', dependencies: [], missing: false }],
+			edges: [],
+			// biome-ignore lint/suspicious/noExplicitAny: intentional XSS test
+			cycles: [['</script><script>alert(1)</script>' as any]],
 		});
-		// block0 gets sub-chunked into 4 diagrams (10 nodes each) → target is in diagram-5
-		expect(out).toContain('href="#diagram-5"');
-		expect(out).toContain('target (Diagram 5)');
+		const out = formatHtml(graph);
+		expect(out).not.toContain('</script><script>');
+		expect(out).toContain('\\u003c/script');
 	});
 });
 
@@ -278,30 +289,6 @@ describe('formatHtml', () => {
 		const out = formatHtml(makeGraph());
 		expect(out).toMatch(/^<!DOCTYPE html>/);
 		expect(out).toContain('</html>');
-	});
-
-	it('embeds the Mermaid CDN script', () => {
-		expect(formatHtml(makeGraph())).toContain('cdn.jsdelivr.net/npm/mermaid');
-	});
-
-	it('uses lazy rendering (startOnLoad: false, IntersectionObserver)', () => {
-		const out = formatHtml(makeGraph());
-		expect(out).toContain('startOnLoad: false');
-		expect(out).not.toContain('startOnLoad: true');
-		expect(out).toContain('IntersectionObserver');
-		expect(out).toContain('rootMargin');
-	});
-
-	it('stores mermaid source in data-src and shows loading placeholder', () => {
-		const out = formatHtml(makeGraph());
-		expect(out).toContain('pre.dataset.src');
-		expect(out).toContain('Loading diagram');
-	});
-
-	it('embeds the mermaid diagram source', () => {
-		const out = formatHtml(makeGraph());
-		expect(out).toContain('graph LR');
-		expect(out).toContain('class="mermaid"');
 	});
 
 	it('shows correct node count in stats (excludes missing)', () => {
@@ -327,6 +314,17 @@ describe('formatHtml', () => {
 		const out = formatHtml(graph);
 		expect(out).toContain('Cycles (1)');
 		expect(out).toContain('a → b → a');
+	});
+
+	it('renders violations section when violations are present', () => {
+		const graph = makeGraph({
+			violations: [
+				{ from: 'database', to: 'logger', fromLifetime: 'SINGLETON', toLifetime: 'TRANSIENT', severity: 'error' },
+			],
+		});
+		const out = formatHtml(graph);
+		expect(out).toContain('Lifetime Violations');
+		expect(out).toContain('1 error');
 	});
 
 	it('includes a legend for all node types', () => {

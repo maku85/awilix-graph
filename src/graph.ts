@@ -1,4 +1,5 @@
 import type { DependencyGraph, GraphEdge, GraphNode } from './types';
+import { detectViolations } from './violations';
 
 export function buildGraph(nodes: GraphNode[]): DependencyGraph {
 	const registered = new Set(nodes.map((n) => n.name));
@@ -26,7 +27,8 @@ export function buildGraph(nodes: GraphNode[]): DependencyGraph {
 
 	const cycles = detectCycles(nodes);
 
-	return { nodes: allNodes, edges, cycles };
+	const violations = detectViolations(allNodes, edges);
+	return { nodes: allNodes, edges, cycles, violations };
 }
 
 // Iterative DFS cycle detection — avoids call-stack overflow on deep dependency chains.

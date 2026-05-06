@@ -99,8 +99,8 @@ describe('Programmatic E2E — examples/container.js', () => {
 	it('renders valid self-contained HTML', () => {
 		const out = renderGraph(graph, 'html');
 		expect(out).toMatch(/^<!DOCTYPE html>/i);
-		expect(out).toContain('mermaid');
-		expect(out).toContain('graph LR');
+		expect(out).toContain('vis-network');
+		expect(out).toContain('new vis.Network(');
 	});
 });
 
@@ -174,7 +174,7 @@ describe('CLI E2E — --format html', () => {
 		const { out, code } = cli(['--format', 'html']);
 		expect(code).toBe(0);
 		expect(out).toMatch(/<!DOCTYPE html>/i);
-		expect(out).toContain('graph LR');
+		expect(out).toContain('vis-network');
 	});
 });
 
