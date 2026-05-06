@@ -132,6 +132,24 @@ describe('inspectContainer', () => {
 		expect(() => inspectContainer({ registrations: null as unknown as Record<string, unknown> } )).toThrow();
 	});
 
+	it('returns an error node when a resolver throws during inspection', () => {
+		// Use a plain fake container so we fully control what registrations contains.
+		// (awilix's container.registrations returns a snapshot, so direct assignment is ignored.)
+		const brokenResolver: Record<string, unknown> = { resolve: () => null };
+		Object.defineProperty(brokenResolver, 'inject', {
+			enumerable: true,
+			configurable: true,
+			get() { throw new Error('resolver exploded'); },
+		});
+
+		const nodes = inspectContainer({ registrations: { broken: brokenResolver } });
+		const node = nodes.find((n) => n.name === 'broken');
+		expect(node?.type).toBe('error');
+		expect(node?.error).toBe('resolver exploded');
+		expect(node?.dependencies).toEqual([]);
+		expect(node?.missing).toBe(false);
+	});
+
 	it('handles a mix of all registration types', () => {
 		const c = createContainer();
 		c.register({
