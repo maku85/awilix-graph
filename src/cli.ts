@@ -165,11 +165,16 @@ async function run(): Promise<void> {
 	}
 
 	const failOn = new Set(
-		(opts.failOn ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+		(opts.failOn ?? '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean)
 	);
 	const failAll = failOn.has('all');
-	if ((failAll || failOn.has('violations')) && violationErrors.length > 0) process.exit(1);
-	if ((failAll || failOn.has('cycles')) && graph.cycles.length > 0) process.exit(1);
+	if ((failAll || failOn.has('violations')) && violationErrors.length > 0)
+		process.exit(1);
+	if ((failAll || failOn.has('cycles')) && graph.cycles.length > 0)
+		process.exit(1);
 }
 
 function printList(

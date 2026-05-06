@@ -5,7 +5,8 @@ export function formatMermaid(graph: DependencyGraph): string {
 	// Two names that differ only in special chars (e.g. "my-svc" vs "my.svc") would both
 	// sanitise to "my_svc" — append a numeric suffix to disambiguate.
 	const nodeIds = buildNodeIdMap(graph.nodes);
-	const nid = (name: string) => nodeIds.get(name) ?? name.replace(/[^a-zA-Z0-9_]/g, '_');
+	const nid = (name: string) =>
+		nodeIds.get(name) ?? name.replace(/[^a-zA-Z0-9_]/g, '_');
 
 	const lines: string[] = ['graph LR'];
 
@@ -45,7 +46,9 @@ export function formatMermaid(graph: DependencyGraph): string {
 		const severity = violationKeys.get(`${edge.from}\0${edge.to}`);
 		if (severity) {
 			const color = severity === 'error' ? '#e53e3e' : '#ed8936';
-			violationStyles.push(`  linkStyle ${edgeIdx} stroke:${color},stroke-width:2.5px`);
+			violationStyles.push(
+				`  linkStyle ${edgeIdx} stroke:${color},stroke-width:2.5px`
+			);
 		}
 		edgeIdx++;
 	}
@@ -110,7 +113,8 @@ function buildNodeIdMap(nodes: GraphNode[]): Map<string, string> {
 		if (names.length === 1) {
 			result.set(names[0], base);
 		} else {
-			names.forEach((name, i) => result.set(name, `${base}_${i}`));
+			for (let i = 0; i < names.length; i++)
+				result.set(names[i], `${base}_${i}`);
 		}
 	}
 	return result;

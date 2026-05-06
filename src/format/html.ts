@@ -3,7 +3,9 @@ import type { DependencyGraph } from '../types';
 export function formatHtml(graph: DependencyGraph): string {
 	const allViolations = graph.violations ?? [];
 	const violationErrors = allViolations.filter((v) => v.severity === 'error');
-	const violationWarnings = allViolations.filter((v) => v.severity === 'warning');
+	const violationWarnings = allViolations.filter(
+		(v) => v.severity === 'warning'
+	);
 	const nodeCount = graph.nodes.filter((n) => !n.missing).length;
 	const missingCount = graph.nodes.filter((n) => n.missing).length;
 	const edgeCount = graph.edges.length;
@@ -22,7 +24,11 @@ export function formatHtml(graph: DependencyGraph): string {
 		.join(' · ');
 
 	const esc = (s: string): string =>
-		s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+		s
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
 
 	// Escape </script> to prevent HTML injection when embedding JSON.
 	const graphJson = JSON.stringify({

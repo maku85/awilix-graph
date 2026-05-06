@@ -18,7 +18,8 @@ export function focusSubgraph(
 		const MAX_SHOWN = 20;
 		const names = graph.nodes.map((n) => n.name);
 		const shown = names.slice(0, MAX_SHOWN).join(', ');
-		const suffix = names.length > MAX_SHOWN ? `, … (${names.length - MAX_SHOWN} more)` : '';
+		const suffix =
+			names.length > MAX_SHOWN ? `, … (${names.length - MAX_SHOWN} more)` : '';
 		throw new Error(
 			`"${name}" is not registered in this container. ` +
 				`Available names: ${shown}${suffix}`

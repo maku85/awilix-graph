@@ -6,7 +6,6 @@ export { formatJson } from './format/json';
 export { formatMermaid } from './format/mermaid';
 export { buildGraph } from './graph';
 export { inspectContainer } from './inspect';
-export { detectViolations } from './violations';
 export type {
 	DependencyGraph,
 	GraphEdge,
@@ -17,6 +16,7 @@ export type {
 	OutputFormat,
 	ViolationSeverity,
 } from './types';
+export { detectViolations } from './violations';
 
 import { formatDot } from './format/dot';
 import { formatHtml } from './format/html';

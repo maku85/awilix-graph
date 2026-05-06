@@ -1,4 +1,9 @@
-import type { GraphEdge, GraphNode, Lifetime, LifetimeViolation } from './types';
+import type {
+	GraphEdge,
+	GraphNode,
+	Lifetime,
+	LifetimeViolation,
+} from './types';
 
 // Longer lifetime = higher rank. A service can only depend on equal or longer lifetimes.
 const RANK: Record<Lifetime, number> = {
