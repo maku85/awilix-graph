@@ -19,62 +19,59 @@ export function formatHtml(graph: DependencyGraph): string {
 		return res;
 	}
 
-	const nodeToBlock: Record<string, number> = {};
-	const diagrams: { src: string; crossLinks: string[] }[] = [];
-	let nodeBlocks: GraphNode[][] = [];
-	if (graph.nodes.length > BLOCK_SIZE) {
-		nodeBlocks = chunk(graph.nodes, BLOCK_SIZE);
-	} else {
-		nodeBlocks = [graph.nodes];
+	// Pass 1: determine final diagram node-groups and pre-generate Mermaid source.
+	// Sub-chunk any block whose rendered size would exceed Mermaid's parser limit.
+	interface DiagramBlock {
+		nodes: GraphNode[];
+		src: string;
 	}
-
-	nodeBlocks.forEach((block, idx) => {
-		for (const n of block) nodeToBlock[n.name] = idx;
-	});
-
-	for (let blockIdx = 0; blockIdx < nodeBlocks.length; ++blockIdx) {
-		const nodes = nodeBlocks[blockIdx];
-		const nodeNames = new Set(nodes.map((n) => n.name));
-		const edges = graph.edges.filter(
-			(e) => nodeNames.has(e.from) && nodeNames.has(e.to)
+	const diagramBlocks: DiagramBlock[] = [];
+	for (const block of chunk(graph.nodes, BLOCK_SIZE)) {
+		const inBlock = new Set(block.map((n) => n.name));
+		const blockEdges = graph.edges.filter(
+			(e) => inBlock.has(e.from) && inBlock.has(e.to)
 		);
-		const subgraph: DependencyGraph = {
-			nodes,
-			edges,
-			cycles: [],
-		};
-		const mermaid = formatMermaid(subgraph);
-		if (mermaid.length > MAX_MERMAID_SIZE && nodes.length > 10) {
-			for (const subNodes of chunk(nodes, 10)) {
-				const subNames = new Set(subNodes.map((n) => n.name));
-				const subEdges = edges.filter(
-					(e) => subNames.has(e.from) && subNames.has(e.to)
+		const src = formatMermaid({ nodes: block, edges: blockEdges, cycles: [] });
+		if (src.length > MAX_MERMAID_SIZE && block.length > 10) {
+			for (const subBlock of chunk(block, 10)) {
+				const inSub = new Set(subBlock.map((n) => n.name));
+				const subEdges = graph.edges.filter(
+					(e) => inSub.has(e.from) && inSub.has(e.to)
 				);
-				const subgraph2: DependencyGraph = {
-					nodes: subNodes,
-					edges: subEdges,
-					cycles: [],
-				};
-				diagrams.push({ src: formatMermaid(subgraph2), crossLinks: [] });
+				diagramBlocks.push({
+					nodes: subBlock,
+					src: formatMermaid({ nodes: subBlock, edges: subEdges, cycles: [] }),
+				});
 			}
 		} else {
-			const crossLinks: string[] = [];
-			for (const n of nodes) {
-				const outgoing = graph.edges.filter(
-					(e) => e.from === n.name && !nodeNames.has(e.to)
-				);
-				for (const e of outgoing) {
-					const targetBlock = nodeToBlock[e.to];
-					if (targetBlock !== undefined && targetBlock !== blockIdx) {
-						crossLinks.push(
-							`<li>${n.name} → <a href="#diagram-${targetBlock + 1}">${e.to} (Diagram ${targetBlock + 1})</a></li>`
-						);
-					}
-				}
-			}
-			diagrams.push({ src: mermaid, crossLinks });
+			diagramBlocks.push({ nodes: block, src });
 		}
 	}
+
+	// Pass 2: build node → diagram-index map from the definitive flat list.
+	const nodeToBlock: Record<string, number> = {};
+	diagramBlocks.forEach(({ nodes }, idx) => {
+		for (const n of nodes) nodeToBlock[n.name] = idx;
+	});
+
+	// Pass 3: attach cross-links using the correct diagram indices.
+	const diagrams = diagramBlocks.map(({ nodes, src }, diagramIdx) => {
+		const inDiagram = new Set(nodes.map((n) => n.name));
+		const crossLinks: string[] = [];
+		for (const n of nodes) {
+			for (const e of graph.edges.filter(
+				(e) => e.from === n.name && !inDiagram.has(e.to)
+			)) {
+				const targetIdx = nodeToBlock[e.to];
+				if (targetIdx !== undefined && targetIdx !== diagramIdx) {
+					crossLinks.push(
+						`<li>${n.name} → <a href="#diagram-${targetIdx + 1}">${e.to} (Diagram ${targetIdx + 1})</a></li>`
+					);
+				}
+			}
+		}
+		return { src, crossLinks };
+	});
 
 	const nodeCount = graph.nodes.filter((n) => !n.missing).length;
 	const missingCount = graph.nodes.filter((n) => n.missing).length;
@@ -120,7 +117,7 @@ export function formatHtml(graph: DependencyGraph): string {
     header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
     .stats { font-size: 0.8rem; color: #a5b4fc; }
     main { flex: 1; padding: 2rem; display: flex; flex-direction: column; gap: 2rem; align-items: center; }
-    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 2rem; max-width: 100%; overflow: auto; margin-bottom: 2rem; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 2rem; max-width: 100%; overflow: auto; }
     .crosslinks { font-size: 0.85em; color: #444; margin-bottom: 0.7em; }
     .crosslinks ul { margin-left: 1.2em; }
     .cycles { margin: 0 2rem 2rem; background: #fff7ed; border: 1px solid #f97316; border-radius: 8px; padding: 1rem 1.5rem; }
@@ -143,7 +140,7 @@ export function formatHtml(graph: DependencyGraph): string {
 				(d, i) => `
       <div class="card" id="diagram-${i + 1}">
         <div style="font-size:0.8em;color:#888;margin-bottom:0.5em;">Diagram ${i + 1} / ${diagrams.length}</div>
-        ${d.crossLinks.length > 0 ? `<div class="crosslinks"><b>Collegamenti ad altri diagrammi:</b><ul>${d.crossLinks.join('')}</ul></div>` : ''}
+        ${d.crossLinks.length > 0 ? `<div class="crosslinks"><b>Links to other diagrams:</b><ul>${d.crossLinks.join('')}</ul></div>` : ''}
         <pre class="mermaid">${d.src}</pre>
       </div>
     `

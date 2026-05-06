@@ -3,7 +3,7 @@ import { formatDot } from '../src/format/dot';
 import { formatHtml } from '../src/format/html';
 import { formatJson } from '../src/format/json';
 import { formatMermaid } from '../src/format/mermaid';
-import type { DependencyGraph } from '../src/types';
+import type { DependencyGraph, GraphNode } from '../src/types';
 
 function makeGraph(overrides: Partial<DependencyGraph> = {}): DependencyGraph {
 	return {
@@ -211,6 +211,51 @@ describe('formatJson', () => {
 		const parsed = JSON.parse(formatJson(makeGraph()));
 		const ghost = parsed.nodes.find((n: { name: string }) => n.name === 'ghost');
 		expect(ghost?.missing).toBe(true);
+	});
+});
+
+describe('formatHtml chunking', () => {
+	function makeNode(name: string): GraphNode {
+		return { name, type: 'class', dependencies: [], missing: false };
+	}
+
+	it('produces a single diagram for graphs with ≤ 40 nodes', () => {
+		const nodes = Array.from({ length: 40 }, (_, i) => makeNode(`n${i}`));
+		const out = formatHtml({ nodes, edges: [], cycles: [] });
+		expect((out.match(/id="diagram-/g) ?? []).length).toBe(1);
+	});
+
+	it('splits into multiple diagrams for graphs with > 40 nodes', () => {
+		const nodes = Array.from({ length: 41 }, (_, i) => makeNode(`n${i}`));
+		const out = formatHtml({ nodes, edges: [], cycles: [] });
+		expect((out.match(/id="diagram-/g) ?? []).length).toBe(2);
+	});
+
+	it('generates a cross-link pointing to the correct target diagram', () => {
+		// n0 lands in diagram-1 (block 0, indices 0–39), n40 in diagram-2 (block 1)
+		const nodes = Array.from({ length: 82 }, (_, i) => makeNode(`n${i}`));
+		const out = formatHtml({ nodes, edges: [{ from: 'n0', to: 'n40' }], cycles: [] });
+		expect(out).toContain('href="#diagram-2"');
+		expect(out).toContain('n40 (Diagram 2)');
+	});
+
+	it('cross-links reference correct diagram when sub-chunking shifts indices', () => {
+		// Build a block-0 whose Mermaid output will be large enough to trigger sub-chunking.
+		// We achieve this by giving every node a very long name (padding to ~1 200 chars each,
+		// so 40 nodes × ~1 200 chars ≈ 48 000 chars — right at the limit).
+		const pad = 'x'.repeat(1180);
+		const block0 = Array.from({ length: 40 }, (_, i) => makeNode(`${pad}${i}`));
+		// block1 has one regular node that block0's first node links to
+		const block1Node = makeNode('target');
+		const nodes = [...block0, block1Node];
+		const out = formatHtml({
+			nodes,
+			edges: [{ from: block0[0].name, to: 'target' }],
+			cycles: [],
+		});
+		// block0 gets sub-chunked into 4 diagrams (10 nodes each) → target is in diagram-5
+		expect(out).toContain('href="#diagram-5"');
+		expect(out).toContain('target (Diagram 5)');
 	});
 });
 
