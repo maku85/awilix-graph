@@ -1,6 +1,6 @@
 {
   "name": "awilix-graph",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Inspect an Awilix DI container and generate a visual dependency graph (DOT/Mermaid/JSON/HTML)",
   "author": "Maku <makuma85@gmail.com>",
   "license": "MIT",
