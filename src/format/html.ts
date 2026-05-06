@@ -115,7 +115,33 @@ export function formatHtml(graph: DependencyGraph): string {
   <title>awilix-graph</title>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { useMaxWidth: false } });
+    mermaid.initialize({ startOnLoad: false, theme: 'default', flowchart: { useMaxWidth: false } });
+    const LOADING = 'min-height:80px;display:flex;align-items:center;justify-content:center;' +
+      'color:#818cf8;font-size:0.85rem;font-family:system-ui,-apple-system,sans-serif;' +
+      'background:#f0f4ff;border:2px dashed #c7d2fe;border-radius:6px;';
+    let seq = 0;
+    const obs = new IntersectionObserver(async (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        obs.unobserve(entry.target);
+        const pre = entry.target;
+        try {
+          const { svg } = await mermaid.render('mg' + (++seq), pre.dataset.src ?? '');
+          const div = document.createElement('div');
+          div.innerHTML = svg;
+          pre.replaceWith(div);
+        } catch (err) {
+          pre.textContent = '⚠ Render error: ' + (err instanceof Error ? err.message : String(err));
+          pre.style.cssText = 'color:#c00;font-size:0.85rem;padding:1rem;font-family:monospace;white-space:pre-wrap';
+        }
+      }
+    }, { rootMargin: '400px' });
+    for (const pre of document.querySelectorAll('pre.mermaid')) {
+      pre.dataset.src = pre.textContent ?? '';
+      pre.textContent = 'Loading diagram…';
+      pre.style.cssText = LOADING;
+      obs.observe(pre);
+    }
   </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

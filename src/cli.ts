@@ -121,7 +121,16 @@ async function run(): Promise<void> {
 	}
 
 	if (opts.open) {
-		const target = openGraph(output, opts.format as OutputFormat);
+		let openOutput = output;
+		let openFormat = opts.format as OutputFormat;
+		if (openFormat === 'mermaid' && output.length > 50_000) {
+			process.stderr.write(
+				'⚠  Mermaid source too large for mermaid.live — opening as HTML instead.\n'
+			);
+			openOutput = renderGraph(graph, 'html');
+			openFormat = 'html';
+		}
+		const target = openGraph(openOutput, openFormat);
 		process.stderr.write(`Opened: ${target}\n`);
 	}
 

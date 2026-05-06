@@ -284,6 +284,20 @@ describe('formatHtml', () => {
 		expect(formatHtml(makeGraph())).toContain('cdn.jsdelivr.net/npm/mermaid');
 	});
 
+	it('uses lazy rendering (startOnLoad: false, IntersectionObserver)', () => {
+		const out = formatHtml(makeGraph());
+		expect(out).toContain('startOnLoad: false');
+		expect(out).not.toContain('startOnLoad: true');
+		expect(out).toContain('IntersectionObserver');
+		expect(out).toContain('rootMargin');
+	});
+
+	it('stores mermaid source in data-src and shows loading placeholder', () => {
+		const out = formatHtml(makeGraph());
+		expect(out).toContain('pre.dataset.src');
+		expect(out).toContain('Loading diagram');
+	});
+
 	it('embeds the mermaid diagram source', () => {
 		const out = formatHtml(makeGraph());
 		expect(out).toContain('graph LR');
