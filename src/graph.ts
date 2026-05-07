@@ -21,8 +21,14 @@ export function buildGraph(nodes: GraphNode[]): DependencyGraph {
 
 	const allNodes = [...nodes, ...missingNodes];
 
+	const seenEdges = new Set<string>();
 	const edges: GraphEdge[] = nodes.flatMap((node) =>
-		node.dependencies.map((dep) => ({ from: node.name, to: dep }))
+		node.dependencies
+			.filter((dep) => {
+				const key = `${node.name}|${dep}`;
+				return !seenEdges.has(key) && !!seenEdges.add(key);
+			})
+			.map((dep) => ({ from: node.name, to: dep }))
 	);
 
 	const cycles = detectCycles(nodes);
