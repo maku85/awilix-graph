@@ -253,7 +253,15 @@ function printList(
 }
 
 function printStats(stats: GraphStats): void {
-	const { nodeCount, missingCount, edgeCount, cycleCount, violationErrorCount, violationWarningCount, nodes } = stats;
+	const {
+		nodeCount,
+		missingCount,
+		edgeCount,
+		cycleCount,
+		violationErrorCount,
+		violationWarningCount,
+		nodes,
+	} = stats;
 
 	const parts: string[] = [`${nodeCount} node${nodeCount !== 1 ? 's' : ''}`];
 	if (missingCount > 0) parts.push(`${missingCount} missing`);

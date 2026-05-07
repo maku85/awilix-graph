@@ -29,15 +29,20 @@ export function computeStats(graph: DependencyGraph): GraphStats {
 				instability,
 			};
 		})
-		.sort((a, b) => b.fanIn - a.fanIn || b.fanOut - a.fanOut || a.name.localeCompare(b.name));
+		.sort(
+			(a, b) =>
+				b.fanIn - a.fanIn || b.fanOut - a.fanOut || a.name.localeCompare(b.name)
+		);
 
 	return {
 		nodeCount: nodes.filter((n) => !n.missing).length,
 		missingCount: nodes.filter((n) => n.missing).length,
 		edgeCount: edges.length,
 		cycleCount: cycles.length,
-		violationErrorCount: violations.filter((v) => v.severity === 'error').length,
-		violationWarningCount: violations.filter((v) => v.severity === 'warning').length,
+		violationErrorCount: violations.filter((v) => v.severity === 'error')
+			.length,
+		violationWarningCount: violations.filter((v) => v.severity === 'warning')
+			.length,
 		nodes: nodeStats,
 	};
 }
