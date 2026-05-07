@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-07
+
+### Added
+
+- **`--stats`** — prints a metrics table for every registered node: fan-in (how many services use it), fan-out (how many dependencies it has), and instability (`fanOut / (fanIn + fanOut)`, a 0–1 score from Robert C. Martin's _Stable Dependencies Principle_). Sorted by fan-in descending so the most-depended-upon nodes appear first. Isolated nodes (fan-in = fan-out = 0) are flagged at the bottom.
+- `computeStats(graph)` added to the programmatic API; returns a `GraphStats` object with per-node `NodeStats` entries and graph-level summary counts.
+- `GraphStats` and `NodeStats` exported from the package.
+
 ## [0.2.0] - 2026-05-06
 
 ### Added

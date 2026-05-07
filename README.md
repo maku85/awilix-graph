@@ -17,6 +17,7 @@ Inspect an [Awilix](https://github.com/jeffijoe/awilix) DI container and generat
 - **Cycle detection** — circular dependencies highlighted in every format
 - **`--focus <name>`** — zoom in on the subgraph around a single registration
 - **`--depth <n>`** — limit graph depth (works standalone or combined with `--focus`)
+- **`--stats`** — metrics table: fan-in, fan-out, and instability per node; surfaces god objects and stable foundations at a glance
 - **`--open`** — open the result in the browser instantly (Mermaid Live / GraphvizOnline / HTML)
 - **`--fail-on`** — exit code 1 on violations or cycles; CI-ready
 - **Programmatic API** — import and use as a library
@@ -55,6 +56,9 @@ awilix-graph -c src/container.ts -f html -o graph.html
 # plain-text summary of all registrations
 awilix-graph -c src/container.ts --list
 
+# metrics table (fan-in, fan-out, instability)
+awilix-graph -c src/container.ts --stats
+
 # fail the build if lifetime violations or cycles are detected
 awilix-graph -c src/container.ts --fail-on all
 ```
@@ -72,6 +76,7 @@ Options:
   --focus <name>           Show only the subgraph reachable from this registration
   --depth <n>              Max traversal depth (works with --focus or standalone)
   --list                   Print a plain-text summary instead of a graph
+  --stats                  Print a metrics table (fan-in, fan-out, instability)
   --open                   Open the result in the browser after rendering
   --fail-on <checks>       Exit 1 when issues are found: cycles, violations, all
   -V, --version            Print version
@@ -143,6 +148,33 @@ Violations are reported on stderr, rendered as coloured edges in every output fo
 ```
 
 Only services with an explicit lifetime declaration are checked — registrations without a lifetime annotation are skipped to avoid false positives.
+
+## `--stats`
+
+Prints a metrics table for every registered node, sorted by **fan-in** descending:
+
+```
+Container stats: 9 nodes · 1 missing · 13 edges · 0 cycles · 0 violations
+
+  Name             Type      Lifetime    Fan-in  Fan-out  Instability
+  ────────────────────────────────────────────────────────────────────
+  config           value     —                3        0         0.00
+  logger           class     SINGLETON        3        0         0.00
+  database         class     SINGLETON        2        2         0.50
+  authService      class     TRANSIENT        1        2         0.67
+  userRepository   class     TRANSIENT        1        1         0.50
+  tokenService     function  TRANSIENT        1        1         0.50
+  emailService     class     TRANSIENT        0        3         1.00
+  orderService     class     TRANSIENT        0        3         1.00
+```
+
+| Metric | Formula | What it tells you |
+|---|---|---|
+| **Fan-in** | incoming edges | How many services depend on this node — high = stable foundation |
+| **Fan-out** | outgoing edges | How many dependencies this node has — high = tightly coupled |
+| **Instability** | `fanOut / (fanIn + fanOut)` | 0 = pure provider (stable), 1 = pure consumer (unstable) |
+
+Nodes with `fan-in = fan-out = 0` are reported separately as **isolated nodes** — they are registered but nothing connects them to the rest of the graph.
 
 ## Output formats
 
@@ -289,7 +321,7 @@ import { createContainer, asClass, asValue } from 'awilix'
 import {
   render, inspect, renderGraph,
   focusSubgraph, limitDepth,
-  detectViolations,
+  detectViolations, computeStats,
 } from 'awilix-graph'
 
 const container = createContainer().register({ ... })
@@ -318,6 +350,11 @@ const shallow = limitDepth(graph, 2)
 // standalone violation analysis
 const violations = detectViolations(graph.nodes, graph.edges)
 const errors = violations.filter(v => v.severity === 'error')
+
+// metrics: fan-in, fan-out, instability per node
+const stats = computeStats(graph)
+console.log(stats.nodeCount)    // total registered nodes
+console.log(stats.nodes)        // NodeStats[] sorted by fan-in desc
 ```
 
 ### Type reference
@@ -352,6 +389,25 @@ interface DependencyGraph {
   edges:       GraphEdge[]
   cycles:      string[][]
   violations?: LifetimeViolation[]  // populated by buildGraph / inspect
+}
+
+interface NodeStats {
+  name:         string
+  type:         NodeType | 'error'
+  lifetime?:    Lifetime
+  fanIn:        number
+  fanOut:       number
+  instability:  number | null  // null when fanIn = fanOut = 0 (isolated node)
+}
+
+interface GraphStats {
+  nodeCount:             number
+  missingCount:          number
+  edgeCount:             number
+  cycleCount:            number
+  violationErrorCount:   number
+  violationWarningCount: number
+  nodes:                 NodeStats[]  // sorted by fanIn desc
 }
 ```
 

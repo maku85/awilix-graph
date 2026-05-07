@@ -7,7 +7,8 @@ import { renderGraph } from './index';
 import { inspectContainer } from './inspect';
 import { loadContainer } from './load';
 import { openGraph } from './open';
-import type { OutputFormat } from './types';
+import { computeStats } from './stats';
+import type { GraphStats, OutputFormat } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { version } = require('../package.json') as { version: string };
@@ -41,6 +42,10 @@ program
 		'Print a plain-text summary of all registrations instead of a graph'
 	)
 	.option(
+		'--stats',
+		'Print a metrics table: fan-in, fan-out, and instability for every node'
+	)
+	.option(
 		'--open',
 		'Open the graph in the browser after rendering (mermaid.live / GraphvizOnline / temp file for json)'
 	)
@@ -59,6 +64,7 @@ const opts = program.opts<{
 	focus?: string;
 	depth?: string;
 	list: boolean;
+	stats: boolean;
 	open: boolean;
 	failOn?: string;
 }>();
@@ -108,6 +114,11 @@ async function run(): Promise<void> {
 	} else if (opts.depth !== undefined) {
 		const depth = parseDepth(opts.depth);
 		Object.assign(graph, limitDepth(graph, depth));
+	}
+
+	if (opts.stats) {
+		printStats(computeStats(graph));
+		return;
 	}
 
 	if (opts.list) {
@@ -239,6 +250,51 @@ function printList(
 			process.stdout.write(`  ⚠ ${cycle.join(' → ')} → ${cycle[0]}\n`);
 		}
 	}
+}
+
+function printStats(stats: GraphStats): void {
+	const { nodeCount, missingCount, edgeCount, cycleCount, violationErrorCount, violationWarningCount, nodes } = stats;
+
+	const parts: string[] = [`${nodeCount} node${nodeCount !== 1 ? 's' : ''}`];
+	if (missingCount > 0) parts.push(`${missingCount} missing`);
+	parts.push(`${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`);
+	parts.push(`${cycleCount} cycle${cycleCount !== 1 ? 's' : ''}`);
+	const totalViolations = violationErrorCount + violationWarningCount;
+	parts.push(`${totalViolations} violation${totalViolations !== 1 ? 's' : ''}`);
+
+	process.stdout.write(`\nContainer stats: ${parts.join(' · ')}\n\n`);
+
+	if (nodes.length === 0) return;
+
+	const nameWidth = Math.max(4, ...nodes.map((n) => n.name.length));
+	const typeWidth = Math.max(4, ...nodes.map((n) => n.type.length));
+	const lifetimeWidth = 9; // 'SINGLETON'.length
+
+	const col = (s: string, w: number) => s.padEnd(w);
+	const rCol = (s: string, w: number) => s.padStart(w);
+
+	const header =
+		`  ${col('Name', nameWidth)}  ${col('Type', typeWidth)}  ${col('Lifetime', lifetimeWidth)}` +
+		`  ${rCol('Fan-in', 7)}  ${rCol('Fan-out', 7)}  ${rCol('Instability', 11)}`;
+	const divider = `  ${'─'.repeat(nameWidth + typeWidth + lifetimeWidth + 36)}`;
+
+	process.stdout.write(`${header}\n${divider}\n`);
+
+	for (const n of nodes) {
+		const instStr = n.instability === null ? '—' : n.instability.toFixed(2);
+		const row =
+			`  ${col(n.name, nameWidth)}  ${col(n.type, typeWidth)}  ${col(n.lifetime ?? '—', lifetimeWidth)}` +
+			`  ${rCol(String(n.fanIn), 7)}  ${rCol(String(n.fanOut), 7)}  ${rCol(instStr, 11)}`;
+		process.stdout.write(`${row}\n`);
+	}
+
+	const isolated = nodes.filter((n) => n.instability === null);
+	if (isolated.length > 0) {
+		process.stdout.write(
+			`\n  ${isolated.length} isolated node${isolated.length !== 1 ? 's' : ''} (fan-in = fan-out = 0): ${isolated.map((n) => n.name).join(', ')}\n`
+		);
+	}
+	process.stdout.write('\n');
 }
 
 function parseDepth(raw: string): number {

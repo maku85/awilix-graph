@@ -40,3 +40,25 @@ export interface DependencyGraph {
 }
 
 export type OutputFormat = 'dot' | 'mermaid' | 'json' | 'html';
+
+export interface NodeStats {
+	name: string;
+	type: NodeType | 'error';
+	lifetime?: Lifetime;
+	/** Number of registered nodes that depend on this node */
+	fanIn: number;
+	/** Number of dependencies this node declares */
+	fanOut: number;
+	/** fanOut / (fanIn + fanOut); null when both are zero (isolated node) */
+	instability: number | null;
+}
+
+export interface GraphStats {
+	nodeCount: number;
+	missingCount: number;
+	edgeCount: number;
+	cycleCount: number;
+	violationErrorCount: number;
+	violationWarningCount: number;
+	nodes: NodeStats[];
+}
