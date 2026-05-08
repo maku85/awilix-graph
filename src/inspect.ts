@@ -13,11 +13,22 @@ interface AwilixContainer {
 /**
  * Inspect an Awilix container and return a list of nodes with their types and dependencies.
  *
- * Works by probing each resolver with two spy containers:
- *  - CLASSIC-mode spy  → intercepts container.resolve(name) calls to collect dep names
- *  - PROXY-mode spy    → examines the resolved value's prototype to detect class vs function
+ * Works by probing each resolver with spy containers. awilix v10+ does not expose `.fn`,
+ * so we cannot use static analysis and must rely on runtime probing:
  *
- * This approach is version-agnostic: it does not rely on resolver internals like `.fn`.
+ *  - PROXY recording-cradle spy (primary): runs the resolver in PROXY mode with a cradle
+ *    that records which service names are accessed. Correctly handles both destructuring
+ *    `({ db, cache }) => {}` and named-container `(container) => { container.db }` patterns.
+ *
+ *  - CLASSIC-mode spy (fallback): intercepts container.resolve(name) calls. Used when the
+ *    PROXY spy collects nothing (e.g. resolvers explicitly set to CLASSIC injection mode, or
+ *    zero-dep factories). Also used for aliasTo detection.
+ *
+ *  - PROXY prototype spy: examines the resolved value's prototype to detect class vs function.
+ *
+ * Note: both spy approaches execute the factory/constructor body as a side effect. The PROXY
+ * spy uses makeSpy() (a recursive proxy that absorbs all operations) for dep values, which
+ * minimises observable side effects compared to passing `undefined`.
  */
 export function inspectContainer(container: AwilixContainer): GraphNode[] {
 	const registrations = container.registrations;
@@ -56,7 +67,7 @@ function extractLifetime(resolver: AnyResolver): Lifetime | undefined {
 
 function probeResolver(
 	resolver: AnyResolver,
-	name: string
+	_name: string
 ): { type: NodeType; dependencies: string[] } {
 	// asValue / aliasTo resolvers have no builder methods like .inject, .transient, etc.
 	if (!('inject' in resolver) || typeof resolver.inject !== 'function') {
@@ -69,7 +80,7 @@ function probeResolver(
 		return { type: 'value', dependencies: [] };
 	}
 
-	const dependencies = collectDepsClassicSpy(resolver, name);
+	const dependencies = collectDeps(resolver);
 	const type = detectTypePrxySpy(resolver);
 
 	return { type, dependencies };
@@ -94,9 +105,58 @@ function detectAliasTarget(resolver: AnyResolver): string | null {
 	return calls.length === 1 ? calls[0] : null;
 }
 
-// Force CLASSIC injection mode so the resolver calls container.resolve(name) for each dep.
-// We intercept those calls to build the dependency list.
-function collectDepsClassicSpy(resolver: AnyResolver, _name: string): string[] {
+// Primary: run the resolver in PROXY mode with a recording cradle.
+// Records which service names are accessed at the top level of the cradle, covering both
+// destructuring `({ db, cache }) => {}` and named-container `(c) => { c.db }` patterns.
+// Falls back to the CLASSIC spy when the PROXY spy collects nothing (explicit CLASSIC-mode
+// resolvers, or zero-dep factories).
+function collectDeps(resolver: AnyResolver): string[] {
+	const proxyDeps = collectDepsProxySpy(resolver);
+	if (proxyDeps.length > 0) return proxyDeps;
+	return collectDepsClassicSpy(resolver);
+}
+
+// PROXY recording-cradle spy: any top-level property access on the cradle is a dep name.
+// Uses makeSpy() for resolved values so the factory/constructor can complete without errors.
+// Properties used internally by JS (Symbol.*) and well-known non-dep names are ignored.
+const CRADLE_SKIP = new Set([
+	'then',
+	'catch',
+	'finally',
+	'toJSON',
+	'inspect',
+	'constructor',
+	'__esModule',
+]);
+
+function collectDepsProxySpy(resolver: AnyResolver): string[] {
+	const accessed = new Set<string>();
+	const spy = makeSpy();
+	const recordingCradle = new Proxy(Object.create(null) as object, {
+		get(_: object, prop: string | symbol) {
+			if (typeof prop === 'string' && !CRADLE_SKIP.has(prop)) {
+				accessed.add(prop);
+			}
+			return spy;
+		},
+	});
+	const mockCtx = { injectionMode: null, injector: null };
+	const mockContainer = {
+		options: { injectionMode: 'PROXY' },
+		cradle: recordingCradle,
+		resolve: () => spy,
+	};
+	try {
+		resolver.resolve.call(mockCtx, mockContainer);
+	} catch {
+		// Factory may throw when operating on spy values — deps already recorded.
+	}
+	return [...accessed];
+}
+
+// Fallback: force CLASSIC injection mode so the resolver calls container.resolve(name) for
+// each dep. We intercept those calls to build the dependency list.
+function collectDepsClassicSpy(resolver: AnyResolver): string[] {
 	const deps: string[] = [];
 	const mockCtx = { injectionMode: 'CLASSIC' as const, injector: null };
 	const mockContainer = {

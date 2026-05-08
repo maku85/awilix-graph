@@ -1,6 +1,10 @@
-// Parse dependency names from a function or class registered in an Awilix container.
+// Public utility: parse dependency names directly from a function or class.
 // Supports: PROXY mode (destructured first arg), CLASSIC mode (positional args),
 // and explicit injection via the RESOLVER symbol.
+//
+// NOTE: this module is NOT used internally by inspectContainer. awilix v10+ resolvers
+// do not expose the underlying function (no .fn property), so we cannot pass it here.
+// inspectContainer uses a runtime spy approach instead (see inspect.ts).
 
 const STRIP_COMMENTS = /\/\*[\s\S]*?\*\/|\/\/.*/g;
 

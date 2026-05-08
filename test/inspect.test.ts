@@ -1,4 +1,4 @@
-import { Lifetime, aliasTo, asClass, asFunction, asValue, createContainer } from 'awilix';
+import { aliasTo, asClass, asFunction, asValue, createContainer, InjectionMode, Lifetime } from 'awilix';
 import { describe, expect, it } from 'vitest';
 import { inspectContainer } from '../src/inspect';
 
@@ -148,6 +148,30 @@ describe('inspectContainer', () => {
 		expect(node?.error).toBe('resolver exploded');
 		expect(node?.dependencies).toEqual([]);
 		expect(node?.missing).toBe(false);
+	});
+
+	it('extracts deps from a PROXY named-container factory', () => {
+		// Uses a single named parameter (the cradle) instead of destructuring.
+		// Deps are accessed eagerly during construction (not inside closures), so the
+		// recording-cradle spy can observe them.
+		// The old CLASSIC-only spy would wrongly return ['container'] as a dep.
+		const namedParamFactory = (container: { db: unknown; cache: unknown }) => {
+			const db = container.db;
+			const cache = container.cache;
+			return { query: () => db, cached: () => cache };
+		};
+		const c = createContainer();
+		c.register({ namedSvc: asFunction(namedParamFactory) });
+		const node = inspectContainer(c).find((n) => n.name === 'namedSvc');
+		expect(node?.dependencies).toEqual(['db', 'cache']);
+	});
+
+	it('extracts deps from an explicit CLASSIC-mode resolver', () => {
+		const classicFactory = (db: unknown, cache: unknown) => ({ db, cache });
+		const c = createContainer({ injectionMode: InjectionMode.CLASSIC });
+		c.register({ classicSvc: asFunction(classicFactory) });
+		const node = inspectContainer(c).find((n) => n.name === 'classicSvc');
+		expect(node?.dependencies).toEqual(['db', 'cache']);
 	});
 
 	it('handles a mix of all registration types', () => {
