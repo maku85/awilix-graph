@@ -1,11 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Command } from 'commander';
+import { analyzeContainerFile } from './analyze';
 import { focusSubgraph, limitDepth } from './focus';
 import { buildGraph } from './graph';
 import { renderGraph } from './index';
-import { inspectContainer } from './inspect';
-import { loadContainer } from './load';
 import { openGraph } from './open';
 import { computeStats } from './stats';
 import type { GraphStats, OutputFormat } from './types';
@@ -78,19 +77,11 @@ async function run(): Promise<void> {
 		);
 	}
 
-	const container = await loadContainer(opts.container).catch((err) =>
-		die(String(err.message))
-	);
-	const nodes = inspectContainer(container);
-
-	const errorNodes = nodes.filter((n) => n.type === 'error');
-	if (errorNodes.length > 0) {
-		process.stderr.write(
-			`\n⚠  ${errorNodes.length} node(s) could not be inspected due to errors.\n`
-		);
-		for (const n of errorNodes) {
-			process.stderr.write(`   - ${n.name}: ${n.error || 'Unknown error'}\n`);
-		}
+	let nodes: ReturnType<typeof analyzeContainerFile>;
+	try {
+		nodes = analyzeContainerFile(opts.container);
+	} catch (err) {
+		die(err instanceof Error ? err.message : String(err));
 	}
 
 	const graph = buildGraph(nodes);
@@ -189,7 +180,7 @@ async function run(): Promise<void> {
 }
 
 function printList(
-	nodes: ReturnType<typeof inspectContainer>,
+	nodes: ReturnType<typeof analyzeContainerFile>,
 	cycles: string[][]
 ): void {
 	const byType = {

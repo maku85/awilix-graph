@@ -27,7 +27,6 @@ Inspect an [Awilix](https://github.com/jeffijoe/awilix) DI container and generat
 
 - **Node.js** ≥ 20.0.0
 - **awilix** ≥ 5.0.0 (peer dependency, installed in the project whose container you are inspecting)
-- **ts-node** or **tsx** — only required to load TypeScript container files
 
 ## Installation
 
@@ -312,9 +311,34 @@ export default async function build() { return container }
 
 Supported extensions: `.js`, `.cjs`, `.mjs`, `.ts`, `.cts`, `.mts`.
 
-TypeScript files require `ts-node` (CJS) or `tsx` (ESM) to be installed in the project.
+TypeScript and JavaScript files are analysed via the TypeScript Compiler API (bundled with the package) — no `ts-node` or `tsx` required.
 
 ## Programmatic API
+
+### File-based analysis (recommended)
+
+`analyzeContainerFile` reads the source file via the TypeScript Compiler API — no code is executed, no side effects occur, result is fully deterministic.
+
+```ts
+import { analyzeContainerFile, buildGraph, renderGraph } from 'awilix-graph'
+
+const nodes = analyzeContainerFile('src/container.ts')
+const graph = buildGraph(nodes)
+const mermaid = renderGraph(graph, 'mermaid')
+```
+
+Known limitations of static analysis:
+
+- Dynamically computed registration keys (`{ [name]: asClass(Foo) }`) are skipped.
+- Classes/functions imported from `node_modules` yield `dependencies: []`.
+- Object spread inside `register({ ...base })` is not followed.
+- Project-local `tsconfig.json` path aliases are not resolved.
+
+In all these cases the node is still emitted (type and lifetime are known from the call site) but `dependencies` will be `[]`.
+
+### Container-object API
+
+Pass a live Awilix container directly — useful when you build the container programmatically and don't have a dedicated file to point to.
 
 ```ts
 import { createContainer, asClass, asValue } from 'awilix'

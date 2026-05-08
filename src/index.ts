@@ -1,3 +1,4 @@
+export { analyzeContainerFile } from './analyze';
 export { parseDependencies } from './deps';
 export { focusSubgraph, limitDepth } from './focus';
 export { formatDot } from './format/dot';
